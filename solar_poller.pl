@@ -120,7 +120,7 @@ $config->define( "data_fac_descr=s"  );
 $config->define( "data_fac_flip=s"  );
 
 # fill variables by reading configuration file
-$config->file( "/home/pi/ginlong_poller_pvoutput/config.ini" ) || die "FAILED to open and/or read config file: config.ini\n";
+$config->file( "/usr/local/bin/config.ini" ) || die "FAILED to open and/or read config file: config.ini\n";
 
 if ($config->flags_debug) {
   print "debug=" . $config->flags_debug ;
