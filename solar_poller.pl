@@ -120,7 +120,7 @@ $config->define( "data_fac_descr=s"  );
 $config->define( "data_fac_flip=s"  );
 
 # fill variables by reading configuration file
-$config->file( "/usr/local/bin/config.ini" ) || die "FAILED to open and/or read config file: config.ini\n";
+$config->file( "/home/pi/ginlong_poller_pvoutput/config.ini" ) || die "FAILED to open and/or read config file: config.ini\n";
 
 if ($config->flags_debug) {
   print "debug=" . $config->flags_debug ;
@@ -524,14 +524,15 @@ sub parseData() {
 	 	 #do nothing here
 	 } else {
 	        #printf " %s:%s", $key, $HoH{$key}{VALUE}, $HoH{$key}{MEAS} ;
-		#$finalOutput .= $key.":".$HoH{$key}{VALUE}." ";
-		$tmpkey = $HoH{$key}{DESCR};
-		$tmpkey =~ s/\s*//g;
-		$finalOutput .= $tmpkey." ".$HoH{$key}{VALUE}."\n";
+		$finalOutput .= $key.":".$HoH{$key}{VALUE}." ";
+		#$tmpkey = $HoH{$key}{DESCR};
+		#$tmpkey =~ s/\s*//g;
+		#$finalOutput .= $tmpkey." ".$HoH{$key}{VALUE}."\n";
 	 }
        }
   }
-  my $wattage = "Wattage ". $HoH{VAC}{VALUE} * $HoH{IAC}{VALUE};
+  #my $wattage = "Wattage ". $HoH{VAC}{VALUE} * $HoH{IAC}{VALUE};
+  my $wattage = $HoH{VAC}{VALUE} * $HoH{IAC}{VALUE};
   if ($config->flags_pvoutput) {
 	my $pvdata = "data=".(strftime "%Y%m%d", localtime).",".$wattage;
   	#we're using curl to send the data to pvoutput
@@ -555,8 +556,8 @@ sub parseData() {
 	}
   } else {
   	#printf " WAC:%s", $wattage ;
-	#$finalOutput .= "WAC:".$wattage;
-	$finalOutput .= $wattage."\n";
+	$finalOutput .= "WAC:".$wattage;
+	#$finalOutput .= $wattage."\n";
 	printf $finalOutput;
 	#my $outputfilesolar="/usr/local/bin/solar_poller_output";
 	#if (($HoH{VAC}{VALUE}!=0)&&($HoH{IAC}{VALUE}!=0)&&($HoH{LMONTH}{VALUE}!=0)&&($HoH{EMONTH}{VALUE}!=0)) {
