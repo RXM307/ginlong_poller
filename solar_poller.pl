@@ -2,7 +2,9 @@
 
 use warnings;
 use AppConfig;  # used to read from a config file
-use WWW::Curl::Easy;
+#use WWW::Curl::Easy;
+use HTTP::Request::Common qw(POST GET);
+use LWP::UserAgent;			
 use POSIX qw(strftime);
 use Data::Dumper;
 
@@ -15,6 +17,10 @@ my $lastPollTime = 0;
 my $nextPollTime = 0;
 my $lastPvoutputTime = 0;
 my $nextPvoutputTime = 0;
+
+use constant {
+   LIVE_DATA_URL        => "http://pvoutput.org/service/r2/addstatus.jsp",
+};
 
 # create a new AppConfig object & auto-define all variables
 my $config = AppConfig->new();
@@ -120,7 +126,7 @@ $config->define( "data_fac_descr=s"  );
 $config->define( "data_fac_flip=s"  );
 
 # fill variables by reading configuration file
-$config->file( "/usr/local/bin/config.ini" ) || die "FAILED to open and/or read config file: config.ini\n";
+$config->file( "/home/pi/ginlong_poller_pvoutput/config.ini" ) || die "FAILED to open and/or read config file: config.ini\n";
 
 if ($config->flags_debug) {
   print "debug=" . $config->flags_debug ;
@@ -534,26 +540,46 @@ sub parseData() {
   #my $wattage = "Wattage ". $HoH{VAC}{VALUE} * $HoH{IAC}{VALUE};
   my $wattage = $HoH{VAC}{VALUE} * $HoH{IAC}{VALUE};
   if ($config->flags_pvoutput) {
-	my $pvdata = "data=".(strftime "%Y%m%d", localtime).",".$wattage;
+  	my $watthours = $HoH{EMONTH}{VALUE} * 1000;
+	my $date = (strftime "%Y%m%d", localtime);
+	my $time = (strftime "%H:%M", localtime);
+	my $ua = LWP::UserAgent->new;
+	$ua->default_header(
+         "X-Pvoutput-Apikey"   => $config->flags_pvoutputkey,
+         "X-Pvoutput-SystemId" => $config->flags_pvoutputid,
+         "Content-Type"        => "application/x-www-form-urlencoded"
+      	);
+	#my $pvdata = "data=".(strftime "%Y%m%d", localtime).",".$wattage;
+	#my $pvdata = "d=".(strftime "%Y%m%d", localtime).",t=".(strftime "%H:%M", localtime).",v1=".$watthours.",v2=".$wattage.",c1=1";
+	my $request = POST LIVE_DATA_URL, [ d => $date, t => $time, v1 => $watthours, v2 => $wattage, c1 => "1" ];
+	#my $pvdata = "data=".(strftime "%Y%m%d", localtime).",".(strftime "%H:%M", localtime).",".$watthours.",".$wattage."&".$cumulative;
   	#we're using curl to send the data to pvoutput
-	my $curl = WWW::Curl::Easy->new;
-	$curl->setopt(CURLOPT_HEADER,1);
-	$curl->setopt(CURLOPT_HTTPHEADER, ["X-Pvoutput-Apikey: ".$config->flags_pvoutputkey , "X-Pvoutput-SystemId: ".$config->flags_pvoutputid] );
-	$curl->setopt(CURLOPT_POST,1);
-	$curl->setopt(CURLOPT_POSTFIELDS,$pvdata);
-	$curl->setopt(CURLOPT_URL, 'http://pvoutput.org/service/r2/addoutput.jsp');
+	my $res = $ua->request($request);
+	#my $curl = WWW::Curl::Easy->new;
+	#$curl->setopt(CURLOPT_HEADER,1);
+	#$curl->setopt(CURLOPT_HTTPHEADER, ["X-Pvoutput-Apikey: ".$config->flags_pvoutputkey , "X-Pvoutput-SystemId: ".$config->flags_pvoutputid] );
+	#$curl->setopt(CURLOPT_POST,1);
+	#$curl->setopt(CURLOPT_POSTFIELDS,$pvdata);
+	#$curl->setopt(CURLOPT_URL, 'http://pvoutput.org/service/r2/addoutput.jsp');
+	#$curl->setopt(CURLOPT_URL, 'http://pvoutput.org/service/r2/addstatus.jsp');
 	if ($config->flags_debug) {
-		$curl->setopt(CURLOPT_VERBOSE,1);
+		#$curl->setopt(CURLOPT_VERBOSE,1);
+		#printf $pvdata;
+		print "Sending to PVOUTPUT [ d => ".$date.", t => ".$time.", v1 => ".$watthours.", v2 => ".$wattage.", c1 => 1 ]\n";
 	}
 	# Starts the actual request
-        my $retcode = $curl->perform;
-	if ($retcode == 0) {
-		print("Transfer went ok\n");
-                my $response_code = $curl->getinfo(CURLINFO_HTTP_CODE);
-	} else {
+        #my $retcode = $curl->perform;
+	#if ($retcode == 0) {
+	#	print("Transfer went ok\n");
+        #        my $response_code = $curl->getinfo(CURLINFO_HTTP_CODE);
+	#} else {
                 # Error code, type of error, error message
-                print("An error happened: $retcode ".$curl->strerror($retcode)." ".$curl->errbuf."\n");
-	}
+        #        print("An error happened: $retcode ".$curl->strerror($retcode)." ".$curl->errbuf."\n");
+	#}
+      	if (! $res->is_success) {
+         die "Error via pvoutput.org: " . $res->content . "\n";
+         #die "Couldn't submit data to pvoutput.org: " . $res->status_line . "\n";
+     	}
   } else {
   	#printf " WAC:%s", $wattage ;
 	$finalOutput .= "WAC:".$wattage;
